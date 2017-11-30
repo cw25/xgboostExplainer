@@ -50,7 +50,7 @@
 #' showWaterfall(xgb.model, explainer, xgb.test.data, test.data,  2, type = "binary")
 #' showWaterfall(xgb.model, explainer, xgb.test.data, test.data,  8, type = "binary")
 
-showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type = "binary", threshold = 0.0001){
+showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type = "binary", threshold = 0.0001, show_intercept = TRUE){
 
 
   breakdown = explainPredictions(xgb.model, explainer, slice(DMatrix,as.integer(idx)))
@@ -62,14 +62,13 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
     pred = 1/(1+exp(-weight))
   }
 
-
   breakdown_summary = as.matrix(breakdown)[1,]
-  
+
   data_for_label = data.matrix[idx,]
 
   i = order(abs(breakdown_summary),decreasing=TRUE)
 
-  
+
 
   breakdown_summary = breakdown_summary[i]
   data_for_label = data_for_label[i]
@@ -88,19 +87,25 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
     data_for_label = data_for_label[-i_other]
   }
 
+  if (show_intercept){
+    breakdown_summary = c(c(intercept), breakdown_summary)
+    data_for_label = c(c(""), data_for_label)
+  }
+
   if (abs(other_impact) > 0){
-    breakdown_summary = c(intercept, breakdown_summary, other_impact)
-    data_for_label = c("", data_for_label,"")
-    labels = paste0(names(breakdown_summary)," = ", data_for_label)
-    labels[1] = 'intercept'
-    labels[length(labels)] = 'other'
-  }else{
-    breakdown_summary = c(intercept, breakdown_summary)
-    data_for_label = c("", data_for_label)
-    labels = paste0(names(breakdown_summary)," = ", data_for_label)
+    breakdown_summary = c(breakdown_summary, c(other_impact))
+    data_for_label = c(data_for_label, c(""))
+  }
+
+  labels = paste0(names(breakdown_summary)," = ", data_for_label)
+
+  if (show_intercept) {
     labels[1] = 'intercept'
   }
 
+  if (abs(other_impact) > 0){
+    labels[length(labels)] = 'other'
+  }
 
 
   if (!is.null(getinfo(DMatrix,"label"))){
@@ -112,6 +117,15 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
   cat('\n')
   print(breakdown_summary)
 
+  y_ticks_shift = function(x) {
+    if (show_intercept) {
+      return(x)
+    }
+    else {
+      return(round(x + intercept, 2))
+    }
+  }
+
   if (type == 'regression'){
 
   waterfalls::waterfall(values = breakdown_summary,
@@ -120,6 +134,7 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
                         total_rect_text = round(weight, 2),
                         calc_total = TRUE,
                         total_axis_text = "Prediction") +
+                          scale_y_continuous(labels = y_ticks_shift) +
                           theme(axis.text.x = element_text(angle = 45, hjust = 1))
   }else{
 
@@ -127,7 +142,7 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
                                      transform = plogis,
                                      inverse = qlogis)
 
-    inverse_logit_labels = function(x){return (1/(1+exp(-x)))}
+    inverse_logit_labels = function(x){return (y_ticks_shift(1/(1+exp(-x))))}
     logit = function(x){return(log(x/(1-x)))}
 
     ybreaks<-logit(seq(2,98,2)/100)
