@@ -8,6 +8,10 @@
 #' @param idx The row number of the data to be explained
 #' @param type The objective function of the model - either "binary" (for binary:logistic) or "regression" (for reg:linear)
 #' @param threshold Default = 0.0001. The waterfall chart will group all variables with absolute impact less than the threshold into a variable called 'Other'
+#' @param printPlot Default = TRUE, which prints the plot. If FALSE, returns ggplot object (e.g. for adding labels to)
+#' @param calcTotal Default = TRUE, which calculates and plots the total pool of the waterfall.
+#' @param show_intercept Default = TRUE, whether to show the intercept.
+
 #' @return None
 #' @export
 #' @import data.table
@@ -50,7 +54,9 @@
 #' showWaterfall(xgb.model, explainer, xgb.test.data, test.data,  2, type = "binary")
 #' showWaterfall(xgb.model, explainer, xgb.test.data, test.data,  8, type = "binary")
 
-showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type = "binary", threshold = 0.0001, show_intercept = TRUE){
+
+showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type = "binary", threshold = 0.0001, printPlot = TRUE, calcTotal = TRUE, show_intercept = TRUE)){
+
 
 
   breakdown = explainPredictions(xgb.model, explainer, slice(DMatrix,as.integer(idx)))
@@ -117,6 +123,7 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
   cat('\n')
   print(breakdown_summary)
 
+
   y_ticks_shift = function(x) {
     if (show_intercept) {
       return(x)
@@ -126,16 +133,23 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
     }
   }
 
+
   if (type == 'regression'){
 
   waterfalls::waterfall(values = breakdown_summary,
                         rect_text_labels = round(breakdown_summary, 2),
                         labels = labels,
                         total_rect_text = round(weight, 2),
+
                         calc_total = TRUE,
-                        total_axis_text = "Prediction") +
+                        total_axis_text = "Prediction",
+                        print_plot = printPlot) +
                           scale_y_continuous(labels = y_ticks_shift) +
-                          theme(axis.text.x = element_text(angle = 45, hjust = 1))
+                           theme(axis.text.x = element_text(angle = 45,
+                                                           hjust = 1),
+                                axis.title = element_text(),
+                                axis.title.x = element_blank())
+
   }else{
 
     inverse_logit_trans <- scales::trans_new("inverse logit",
@@ -151,11 +165,14 @@ showWaterfall = function(xgb.model, explainer, DMatrix, data.matrix, idx, type =
                           rect_text_labels = round(breakdown_summary, 2),
                           labels = labels,
                           total_rect_text = round(weight, 2),
-                          calc_total = TRUE,
-                          total_axis_text = "Prediction")  +
+                          calc_total = calcTotal,
+                          total_axis_text = "Prediction",
+                          print_plot = printPlot)  +
                             scale_y_continuous(labels = inverse_logit_labels,
-                                                breaks = ybreaks) +
-                            theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
+                                               breaks = ybreaks) +
+                            theme(axis.text.x = element_text(angle = 45,
+                                                             hjust = 1),
+                                  axis.title = element_text(),
+                                  axis.title.x = element_blank())
   }
 }
